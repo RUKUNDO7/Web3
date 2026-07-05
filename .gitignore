@@ -1,1 +1,116 @@
-truffle-greeter-dapp/artifacts/
+# ==========================
+# Dependencies
+# ==========================
+node_modules/
+
+# ==========================
+# Environment Variables
+# ==========================
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Never expose private keys or API keys
+*.pem
+*.key
+
+# ==========================
+# Logs
+# ==========================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==========================
+# Build Output
+# ==========================
+dist/
+build/
+out/
+coverage/
+
+# ==========================
+# Cache
+# ==========================
+.cache/
+.parcel-cache/
+.next/
+.vite/
+.turbo/
+.eslintcache
+
+# ==========================
+# Hardhat
+# ==========================
+artifacts/
+cache/
+typechain/
+typechain-types/
+
+# ==========================
+# Foundry
+# ==========================
+out/
+cache/
+
+# ==========================
+# Truffle
+# ==========================
+build/contracts/
+
+# ==========================
+# React Native / Expo
+# ==========================
+.expo/
+.expo-shared/
+
+# ==========================
+# VS Code
+# ==========================
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# ==========================
+# JetBrains IDEs
+# ==========================
+.idea/
+
+# ==========================
+# OS Files
+# ==========================
+.DS_Store
+Thumbs.db
+
+# ==========================
+# Temporary Files
+# ==========================
+*.tmp
+*.temp
+*.swp
+
+# ==========================
+# Package Managers
+# ==========================
+.pnp
+.pnp.js
+
+# ==========================
+# Test Coverage
+# ==========================
+coverage/
+
+# ==========================
+# Local Blockchain
+# ==========================
+ganache_db/
+
+# ==========================
+# Miscellaneous
+# ==========================
+*.pid
