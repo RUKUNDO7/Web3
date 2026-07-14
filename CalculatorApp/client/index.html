@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CalcChain — Decentralized Calculator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.10.0/web3.min.js"></script>
+  <style>
+    /* ── Design tokens ─────────────────────────────────────────── */
+    :root {
+      --bg:         #0b0f1a;
+      --surface:    #111827;
+      --card:       #1a2236;
+      --border:     #1f2e4a;
+      --accent:     #3b82f6;
+      --accent2:    #06b6d4;
+      --success:    #10b981;
+      --error:      #f43f5e;
+      --text:       #e2e8f0;
+      --muted:      #64748b;
+      --mono:       'JetBrains Mono', 'Fira Code', monospace;
+      --sans:       'Inter', system-ui, sans-serif;
+      --radius:     12px;
+      --radius-sm:  8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 64px;
+    }
+
+    /* ── Header ────────────────────────────────────────────────── */
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .logo-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .logo-icon {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .tagline {
+      color: var(--muted);
+      font-size: 0.875rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ── Status bar ─────────────────────────────────────────────── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 20px;
+      font-size: 0.8rem;
+      margin-bottom: 32px;
+      font-family: var(--mono);
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+    .dot.connected   { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .dot.error       { background: var(--error); }
+    #statusText { color: var(--muted); }
+
+    /* ── Main grid ──────────────────────────────────────────────── */
+    .grid {
+      width: 100%;
+      max-width: 960px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 680px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Cards ──────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+    .card-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    /* ── Form elements ──────────────────────────────────────────── */
+    label {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      letter-spacing: 0.02em;
+    }
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 1rem;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      margin-bottom: 16px;
+    }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.875rem;
+      padding: 10px 20px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      width: 100%;
+    }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+
+    .btn-metamask {
+      background: #f6851b;
+      color: #fff;
+      width: 100%;
+    }
+    .btn-metamask:hover:not(:disabled) { opacity: 0.88; }
+
+    /* ── Operator grid ──────────────────────────────────────────── */
+    .op-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .op-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 1.25rem;
+      font-weight: 700;
+      padding: 14px;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+    .op-btn:hover { background: var(--border); }
+    .op-btn.active {
+      background: rgba(59,130,246,0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .op-btn:active { transform: scale(0.94); }
+
+    /* ── Result display ─────────────────────────────────────────── */
+    .result-display {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      margin-top: 8px;
+      min-height: 72px;
+    }
+    .result-expr {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .result-value {
+      font-family: var(--mono);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent2);
+      word-break: break-all;
+    }
+    .result-value.error { color: var(--error); font-size: 1rem; }
+
+    /* ── Hello banner ───────────────────────────────────────────── */
+    .hello-banner {
+      display: none;
+      background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(6,182,212,0.1));
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-top: 16px;
+      color: var(--accent2);
+      text-align: center;
+    }
+    .hello-banner.visible { display: block; }
+
+    /* ── TX log ─────────────────────────────────────────────────── */
+    .tx-log {
+      margin-top: 24px;
+      grid-column: 1 / -1;
+    }
+    .tx-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .tx-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      animation: fadeIn 0.3s ease;
+    }
+    .tx-hash { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+    .tx-op   { color: var(--accent); font-weight: 700; }
+    .tx-res  { color: var(--success); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+    /* ── Loading spinner ────────────────────────────────────────── */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .spinner.visible { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-row">
+      <div class="logo-icon">⛓</div>
+      <h1>CalcChain</h1>
+    </div>
+    <p class="tagline">Decentralized Calculator · Ethereum Smart Contract</p>
+  </header>
+
+  <div class="status-bar">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Not connected</span>
+  </div>
+
+  <div class="grid">
+
+    <!-- ── Connect card ── -->
+    <div class="card">
+      <p class="card-title">01 · Wallet &amp; Identity</p>
+
+      <button class="btn btn-metamask" id="connectBtn" onclick="connectMetaMask()">
+        <svg width="20" height="20" viewBox="0 0 318.6 318.6" fill="none">
+          <polygon fill="#E2761B" points="274.1,35.5 174.6,109.4 193,65.8 "/>
+          <polygon fill="#E4761B" points="44.4,35.5 143.1,110.1 125.6,65.8 "/>
+        </svg>
+        Connect MetaMask
+      </button>
+
+      <div style="height:20px"></div>
+
+      <label>Your Name</label>
+      <input type="text" id="nameInput" placeholder="Enter your name…" />
+
+      <button class="btn btn-primary" onclick="setName()">
+        <div class="spinner" id="nameSpinner"></div>
+        Save Name on Chain
+      </button>
+
+      <div class="hello-banner" id="helloBanner"></div>
+
+      <div style="margin-top:20px">
+        <label>Stored Name (from contract)</label>
+        <button class="btn btn-primary" style="background: var(--surface); border:1px solid var(--border); color:var(--text);" onclick="getName()">
+          Read Name from Chain
+        </button>
+        <div id="storedName" style="font-family:var(--mono); font-size:0.9rem; color:var(--accent2); margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <!-- ── Calculator card ── -->
+    <div class="card">
+      <p class="card-title">02 · Calculator</p>
+
+      <label>Number A</label>
+      <input type="number" id="numA" placeholder="0" />
+
+      <label>Number B</label>
+      <input type="number" id="numB" placeholder="0" />
+
+      <div class="op-grid">
+        <button class="op-btn active" id="op-add"      onclick="selectOp('add',      this)">+</button>
+        <button class="op-btn"        id="op-subtract" onclick="selectOp('subtract', this)">−</button>
+        <button class="op-btn"        id="op-multiply" onclick="selectOp('multiply', this)">×</button>
+        <button class="op-btn"        id="op-divide"   onclick="selectOp('divide',   this)">÷</button>
+      </div>
+
+      <button class="btn btn-primary" onclick="calculate()">
+        <div class="spinner" id="calcSpinner"></div>
+        Calculate on Chain
+      </button>
+
+      <div class="result-display" style="margin-top:16px">
+        <div class="result-expr" id="resultExpr">Awaiting calculation…</div>
+        <div class="result-value" id="resultValue">—</div>
+      </div>
+    </div>
+
+    <!-- ── TX log ── -->
+    <div class="card tx-log">
+      <p class="card-title">Transaction Log</p>
+      <ul class="tx-list" id="txList">
+        <li style="color:var(--muted); font-size:0.8rem; font-family:var(--mono);">No transactions yet.</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <script>
+  // ── Contract ABI (generated after `truffle compile`) ──────────────────────
+  // PASTE YOUR COMPILED ABI HERE after running: truffle compile
+  const CONTRACT_ABI = [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true,  "internalType": "address", "name": "user",      "type": "address" },
+        { "indexed": false, "internalType": "string",  "name": "operation", "type": "string"  },
+        { "indexed": false, "internalType": "int256",  "name": "a",         "type": "int256"  },
+        { "indexed": false, "internalType": "int256",  "name": "b",         "type": "int256"  },
+        { "indexed": false, "internalType": "int256",  "name": "result",    "type": "int256"  }
+      ],
+      "name": "CalculationPerformed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true,  "internalType": "address", "name": "user", "type": "address" },
+        { "indexed": false, "internalType": "string",  "name": "name", "type": "string"  }
+      ],
+      "name": "NameSet",
+      "type": "event"
+    },
+    {
+      "inputs": [{ "internalType": "int256", "name": "a", "type": "int256" }, { "internalType": "int256", "name": "b", "type": "int256" }],
+      "name": "add",
+      "outputs": [{ "internalType": "int256", "name": "", "type": "int256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "int256", "name": "a", "type": "int256" }, { "internalType": "int256", "name": "b", "type": "int256" }],
+      "name": "subtract",
+      "outputs": [{ "internalType": "int256", "name": "", "type": "int256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "int256", "name": "a", "type": "int256" }, { "internalType": "int256", "name": "b", "type": "int256" }],
+      "name": "multiply",
+      "outputs": [{ "internalType": "int256", "name": "", "type": "int256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "int256", "name": "a", "type": "int256" }, { "internalType": "int256", "name": "b", "type": "int256" }],
+      "name": "divide",
+      "outputs": [{ "internalType": "int256", "name": "", "type": "int256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "string", "name": "_name", "type": "string" }],
+      "name": "setName",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getName",
+      "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getLastResult",
+      "outputs": [{ "internalType": "int256", "name": "", "type": "int256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ];
+
+  // ── PASTE YOUR DEPLOYED CONTRACT ADDRESS HERE ─────────────────────────────
+  // After `truffle migrate`, copy the address printed in the console:
+  const CONTRACT_ADDRESS = "0xYOUR_CONTRACT_ADDRESS_HERE";
+
+  // ── App state ─────────────────────────────────────────────────────────────
+  let web3, contract, accounts;
+  let selectedOp = 'add';
+
+  // ── MetaMask connection ───────────────────────────────────────────────────
+  async function connectMetaMask() {
+    const btn = document.getElementById('connectBtn');
+    if (!window.ethereum) {
+      setStatus('MetaMask not detected — please install it', 'error');
+      return;
+    }
+    try {
+      btn.disabled = true;
+      btn.textContent = 'Connecting…';
+      accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      web3 = new Web3(window.ethereum);
+      contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+      const shortAddr = accounts[0].slice(0, 6) + '…' + accounts[0].slice(-4);
+      setStatus(`Connected: ${shortAddr}`, 'connected');
+      btn.textContent = '✓ Connected';
+
+      // Listen for account changes
+      window.ethereum.on('accountsChanged', accs => {
+        accounts = accs;
+        const addr = accs[0].slice(0, 6) + '…' + accs[0].slice(-4);
+        setStatus(`Connected: ${addr}`, 'connected');
+      });
+    } catch (err) {
+      setStatus('Connection rejected', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Connect MetaMask';
+    }
+  }
+
+  // ── Name functions ────────────────────────────────────────────────────────
+  async function setName() {
+    if (!ensureConnected()) return;
+    const name = document.getElementById('nameInput').value.trim();
+    if (!name) { alert('Please enter a name.'); return; }
+    const spinner = document.getElementById('nameSpinner');
+    spinner.classList.add('visible');
+    try {
+      const tx = await contract.methods.setName(name).send({ from: accounts[0] });
+      const banner = document.getElementById('helloBanner');
+      banner.textContent = `👋 Hello World, ${name}!`;
+      banner.classList.add('visible');
+      addTxLog('setName', `"${name}"`, tx.transactionHash);
+    } catch (err) {
+      alert('Transaction failed: ' + (err.message || err));
+    }
+    spinner.classList.remove('visible');
+  }
+
+  async function getName() {
+    if (!ensureConnected()) return;
+    try {
+      const name = await contract.methods.getName().call();
+      const el = document.getElementById('storedName');
+      if (name) {
+        el.textContent = `Stored name: "${name}"`;
+        document.getElementById('helloBanner').textContent = `👋 Hello World, ${name}!`;
+        document.getElementById('helloBanner').classList.add('visible');
+      } else {
+        el.textContent = 'No name stored yet.';
+      }
+    } catch (err) {
+      alert('Read failed: ' + err.message);
+    }
+  }
+
+  // ── Calculator functions ──────────────────────────────────────────────────
+  function selectOp(op, btn) {
+    selectedOp = op;
+    document.querySelectorAll('.op-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  const opSymbols = { add: '+', subtract: '−', multiply: '×', divide: '÷' };
+
+  async function calculate() {
+    if (!ensureConnected()) return;
+    const a = document.getElementById('numA').value;
+    const b = document.getElementById('numB').value;
+    if (a === '' || b === '') { alert('Enter both numbers.'); return; }
+
+    const aInt = parseInt(a), bInt = parseInt(b);
+    if (selectedOp === 'divide' && bInt === 0) {
+      showResult(`${aInt} ${opSymbols[selectedOp]} ${bInt}`, 'Division by zero!', true);
+      return;
+    }
+
+    const spinner = document.getElementById('calcSpinner');
+    spinner.classList.add('visible');
+    document.getElementById('resultExpr').textContent = 'Sending transaction…';
+    document.getElementById('resultValue').textContent = '…';
+    document.getElementById('resultValue').className = 'result-value';
+
+    try {
+      const tx = await contract.methods[selectedOp](aInt, bInt).send({ from: accounts[0] });
+      // Read back the result
+      const result = await contract.methods.getLastResult().call();
+      const expr = `${aInt} ${opSymbols[selectedOp]} ${bInt}`;
+      showResult(expr, result, false);
+      addTxLog(selectedOp, expr + ` = ${result}`, tx.transactionHash);
+    } catch (err) {
+      showResult('', err.message || 'Transaction failed', true);
+    }
+    spinner.classList.remove('visible');
+  }
+
+  function showResult(expr, value, isError) {
+    document.getElementById('resultExpr').textContent = expr || 'Error';
+    const el = document.getElementById('resultValue');
+    el.textContent = value;
+    el.className = 'result-value' + (isError ? ' error' : '');
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function ensureConnected() {
+    if (!web3 || !accounts) {
+      alert('Please connect MetaMask first.');
+      return false;
+    }
+    if (CONTRACT_ADDRESS === '0xYOUR_CONTRACT_ADDRESS_HERE') {
+      alert('Update CONTRACT_ADDRESS in the HTML file with your deployed contract address.');
+      return false;
+    }
+    return true;
+  }
+
+  function setStatus(msg, state) {
+    document.getElementById('statusText').textContent = msg;
+    const dot = document.getElementById('statusDot');
+    dot.className = 'dot ' + (state || '');
+  }
+
+  function addTxLog(op, detail, hash) {
+    const list = document.getElementById('txList');
+    if (list.children.length === 1 && list.children[0].tagName === 'LI' && !list.children[0].className) {
+      list.innerHTML = '';
+    }
+    const item = document.createElement('li');
+    item.className = 'tx-item';
+    item.innerHTML = `
+      <span class="tx-op">${op}</span>
+      <span style="color:var(--text); flex:1">${detail}</span>
+      <span class="tx-hash" title="${hash}">${hash ? hash.slice(0,10)+'…' : 'view'}</span>
+      <span class="tx-res">✓</span>
+    `;
+    list.prepend(item);
+  }
+
+  // Auto-connect if already authorized
+  window.addEventListener('load', async () => {
+    if (window.ethereum) {
+      const accs = await window.ethereum.request({ method: 'eth_accounts' });
+      if (accs.length > 0) {
+        connectMetaMask();
+      } else {
+        setStatus('MetaMask found — click Connect', '');
+      }
+    } else {
+      setStatus('MetaMask not detected', 'error');
+    }
+  });
+  </script>
+</body>
+</html>
