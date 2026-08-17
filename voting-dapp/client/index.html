@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voting DApp</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.5.3/dist/web3.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f7fa;
+    }
+    h1 { color: #333; }
+    button {
+      background-color: #1e90ff;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 5px 0;
+    }
+    button:hover { background-color: #1c86ee; }
+    ul { list-style: none; padding: 0; }
+    li {
+      background: white;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #account { color: #555; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Voting DApp</h1>
+  <button onclick="connectMetaMask()">Connect MetaMask</button>
+  <p id="account">Not connected</p>
+  <h2>Candidates</h2>
+  <ul id="candidates"></ul>
+  <script src="app.js"></script>
+</body>
+</html>
